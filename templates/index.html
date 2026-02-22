@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dermatology AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <i class="fa-solid fa-notes-medical logo-icon"></i>
+                <h2>DermaAI</h2>
+            </div>
+            <div class="nav-menu">
+                <a href="#" class="nav-item active"><i class="fa-solid fa-message"></i> ปรึกษาใหม่</a>
+                <a href="#" class="nav-item" onclick="alert('ฟีเจอร์นี้อยู่ระหว่างการพัฒนา')"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติส่วนตัว</a>
+                <a href="#" class="nav-item" onclick="alert('ฟีเจอร์นี้อยู่ระหว่างการพัฒนา')"><i class="fa-solid fa-gear"></i> ตั้งค่า</a>
+            </div>
+            <div class="user-profile">
+                <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="user-info">
+                    <span class="name">Guest User</span>
+                    <span class="status"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 4px;"></i>Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <header class="chat-header">
+                <div>
+                    <h1>ปรึกษาปัญหาโรคผิวหนัง</h1>
+                    <p>ผู้ช่วยอัจฉริยะวิเคราะห์อาการและให้คำแนะนำเบื้องต้น</p>
+                </div>
+                <div class="header-actions">
+                    <button class="action-btn" title="ล้างแชท" onclick="clearChat()"><i class="fa-solid fa-trash"></i></button>
+                    <button class="action-btn" title="สลับโหมด" onclick="toggleTheme()"><i class="fa-solid fa-sun"></i></button>
+                </div>
+            </header>
+            
+            <div class="chat-messages" id="chat-messages">
+                <!-- Welcome Message -->
+                <div class="message bot-message fade-in">
+                    <div class="message-avatar">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="message-bubble">
+                        สวัสดีค่ะ ฉันคือ DermaAI ผู้ช่วยให้คำปรึกษาด้านโรคผิวหนัง คุณมีอาการหรือข้อสงสัยอะไรเกี่ยวกับผิวหนังให้ฉันช่วยวิเคราะห์เบื้องต้นไหมคะ?
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="input-wrapper">
+                    <textarea id="user-input" placeholder="พิมพ์อาการหรือข้อสงสัยของคุณที่นี่..." rows="1"></textarea>
+                    <button id="send-btn" class="send-btn">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="disclaimer">
+                    <i class="fa-solid fa-circle-info"></i> คำแนะนำนี้เป็นการประเมินเบื้องต้นเท่านั้น หากมีอาการรุนแรงควรปรึกษาแพทย์เฉพาะทาง
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
