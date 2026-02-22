@@ -42,14 +42,22 @@ vectorstore = Chroma.from_texts(
 
 # --- 4. ฟังก์ชันสำหรับดึงข้อมูลและตอบคำถาม ---
 def get_dermatology_response(user_query):
+    # ป้องกันกรณี Query ว่างเปล่าทำให้ Vector Store Error
+    if not user_query or not str(user_query).strip():
+        return "กรุณาพิมพ์คำถามของคุณค่ะ"
+
     # ก. ค้นหาข้อมูลที่เกี่ยวข้องจากฐานข้อมูล (Retrieval)
-    # ค้นหา 2 ประโยคที่ใกล้เคียงที่สุด
-    docs = vectorstore.similarity_search(user_query, k=2)
-    context = "\n".join([d.page_content for d in docs])
+    # ค้นหา 4 ประโยคที่ใกล้เคียงที่สุด (เพิ่มจำนวนจาก 2 เป็น 4 เพื่อให้ได้เนื้อหาครอบคลุมขึ้น)
+    docs = vectorstore.similarity_search(user_query, k=4)
+    # ใส่ (-) หน้าข้อความเพื่อให้อ่านง่ายขึ้น
+    context = "\n".join([f"- {d.page_content}" for d in docs])
 
     # ข. สร้าง Prompt โดยนำ Context ไปใส่ (Augmentation)
     system_prompt = f"""คุณคือผู้ช่วยอัจฉริยะด้านโรคผิวหนัง 
-    จงตอบคำถามโดยใช้ข้อมูลที่ให้มาด้านล่างนี้เท่านั้น หากไม่มีข้อมูลให้ตอบว่าไม่ทราบและแนะนำให้ปรึกษาแพทย์
+    จงตอบคำถามโดยอ้างอิงและใช้ข้อมูลที่ให้มาใน "ข้อมูลอ้างอิง" ด้านล่างนี้เป็นหลัก
+    หากผู้ใช้ถามหาวิธีรักษาหรือดูแล ให้สรุปขั้นตอนจากข้อมูลอ้างอิงเป็นข้อๆ ให้เข้าใจง่าย
+    หากไม่มีข้อมูลใดๆ ใน "ข้อมูลอ้างอิง" ที่เกี่ยวข้องกับคำถามเลย ให้ตอบว่าไม่ทราบและแนะนำให้ปรึกษาแพทย์
+    ห้ามแต่งข้อมูลขึ้นมาเองเด็ดขาด
     
     ข้อมูลอ้างอิง:
     {context}
@@ -62,7 +70,8 @@ def get_dermatology_response(user_query):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_query},
         ],
-        stream=False
+        stream=False,
+        temperature=0.1 # ลดอุณหภูมิลงเพื่อให้ตอบตรงตาม Context มากที่สุด
     )
     
     return response.choices[0].message.content
