@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Embedding — DermaAI</title>
+    <meta name="description" content="อัพโหลดและ Embed ข้อมูลความรู้ด้านโรคผิวหนังเข้าสู่ฐานข้อมูล Vector Store">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='embed.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <i class="fa-solid fa-notes-medical logo-icon"></i>
+                <h2>DermaAI</h2>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-item"><i class="fa-solid fa-message"></i> ปรึกษาใหม่</a>
+                <a href="/embed" class="nav-item active"><i class="fa-solid fa-database"></i> จัดการข้อมูล</a>
+                <a href="#" class="nav-item" onclick="alert('ฟีเจอร์นี้อยู่ระหว่างการพัฒนา')"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติส่วนตัว</a>
+                <a href="#" class="nav-item" onclick="alert('ฟีเจอร์นี้อยู่ระหว่างการพัฒนา')"><i class="fa-solid fa-gear"></i> ตั้งค่า</a>
+            </div>
+            <div class="user-profile">
+                <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="user-info">
+                    <span class="name">Admin</span>
+                    <span class="status"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 4px;"></i>Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Embed Area -->
+        <main class="embed-main">
+            <header class="chat-header">
+                <div>
+                    <h1><i class="fa-solid fa-database" style="color: var(--primary); margin-right: 10px; font-size: 18px;"></i>Data Embedding</h1>
+                    <p>อัพโหลดไฟล์หรือพิมพ์ข้อความเพื่อเพิ่มข้อมูลเข้าสู่ฐานข้อมูลความรู้</p>
+                </div>
+                <div class="header-actions">
+                    <button class="action-btn" title="สลับโหมด" onclick="toggleTheme()" id="theme-btn">
+                        <i class="fa-solid fa-sun"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="embed-content">
+                <!-- Left Panel: Input -->
+                <div class="embed-panel input-panel">
+                    <!-- Tab Switcher -->
+                    <div class="tab-switcher">
+                        <button class="tab-btn active" id="tab-file" onclick="switchTab('file')">
+                            <i class="fa-solid fa-file-arrow-up"></i> อัพโหลดไฟล์
+                        </button>
+                        <button class="tab-btn" id="tab-text" onclick="switchTab('text')">
+                            <i class="fa-solid fa-pen-to-square"></i> พิมพ์ข้อความ
+                        </button>
+                    </div>
+
+                    <!-- File Upload Tab -->
+                    <div class="tab-content active" id="content-file">
+                        <div class="dropzone" id="dropzone"
+                             ondragover="handleDragOver(event)"
+                             ondragleave="handleDragLeave(event)"
+                             ondrop="handleDrop(event)"
+                             onclick="document.getElementById('file-input').click()">
+                            <div class="dropzone-icon">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </div>
+                            <p class="dropzone-title">ลากและวางไฟล์ที่นี่</p>
+                            <p class="dropzone-sub">หรือคลิกเพื่อเลือกไฟล์จากอุปกรณ์ของคุณ</p>
+                            <div class="dropzone-formats">
+                                <span class="format-badge"><i class="fa-solid fa-file-lines"></i> .txt</span>
+                                <span class="format-badge"><i class="fa-solid fa-file-word"></i> .docx</span>
+                            </div>
+                        </div>
+                        <input type="file" id="file-input" accept=".txt,.docx" hidden onchange="handleFileSelect(event)">
+
+                        <!-- File Preview Card -->
+                        <div class="file-card" id="file-card" style="display:none;">
+                            <div class="file-card-icon" id="file-card-icon">
+                                <i class="fa-solid fa-file-lines"></i>
+                            </div>
+                            <div class="file-card-info">
+                                <span class="file-card-name" id="file-card-name">filename.txt</span>
+                                <span class="file-card-size" id="file-card-size">0 KB</span>
+                            </div>
+                            <button class="file-card-remove" onclick="removeFile()" title="ลบไฟล์">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Text Input Tab -->
+                    <div class="tab-content" id="content-text">
+                        <div class="text-input-wrapper">
+                            <label class="text-input-label">
+                                <i class="fa-solid fa-pen-nib"></i> ข้อมูลความรู้
+                            </label>
+                            <textarea
+                                id="text-input"
+                                class="embed-textarea"
+                                placeholder="พิมพ์หรือวางข้อความที่ต้องการเพิ่มเข้าฐานข้อมูลที่นี่...&#10;&#10;เช่น: โรคผื่นภูมิแพ้ผิวหนัง (Atopic Dermatitis) มักมีอาการผิวแห้ง คันมาก และมีผื่นแดงตามข้อพับ"
+                                oninput="updateTextPreview()"
+                            ></textarea>
+                            <div class="text-stats">
+                                <span id="char-count">0 ตัวอักษร</span>
+                                <span id="word-count">0 คำ</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Embed Options -->
+                    <div class="embed-options">
+                        <div class="option-group">
+                            <label class="option-label"><i class="fa-solid fa-scissors"></i> ขนาด Chunk</label>
+                            <input type="number" id="chunk-size" class="option-input" value="500" min="100" max="2000" step="50">
+                            <span class="option-unit">ตัวอักษร</span>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label"><i class="fa-solid fa-layer-group"></i> Overlap</label>
+                            <input type="number" id="chunk-overlap" class="option-input" value="50" min="0" max="500" step="10">
+                            <span class="option-unit">ตัวอักษร</span>
+                        </div>
+                    </div>
+
+                    <button class="embed-btn" id="embed-btn" onclick="startEmbedding()">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span>เริ่ม Embedding</span>
+                    </button>
+                </div>
+
+                <!-- Right Panel: Preview & Status -->
+                <div class="embed-panel preview-panel">
+                    <div class="preview-header">
+                        <h3><i class="fa-solid fa-eye"></i> Preview & ผลลัพธ์</h3>
+                        <button class="clear-preview-btn" onclick="clearPreview()" title="ล้างข้อมูล">
+                            <i class="fa-solid fa-rotate-left"></i> รีเซ็ต
+                        </button>
+                    </div>
+
+                    <!-- Preview Content -->
+                    <div class="preview-box" id="preview-box">
+                        <div class="preview-placeholder">
+                            <i class="fa-solid fa-file-magnifying-glass"></i>
+                            <p>เนื้อหาของไฟล์หรือข้อความที่คุณเลือกจะแสดงที่นี่</p>
+                        </div>
+                    </div>
+
+                    <!-- Status Log -->
+                    <div class="status-section">
+                        <div class="status-header">
+                            <h4><i class="fa-solid fa-terminal"></i> Status Log</h4>
+                            <div class="status-indicator" id="status-indicator">
+                                <span class="status-dot idle"></span>
+                                <span id="status-text">พร้อมใช้งาน</span>
+                            </div>
+                        </div>
+                        <div class="status-log" id="status-log">
+                            <div class="log-entry info">
+                                <span class="log-time">--:--:--</span>
+                                <span>ระบบพร้อมรับข้อมูลใหม่</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Cards -->
+                    <div class="stats-grid">
+                        <div class="stat-card" id="stat-chunks">
+                            <div class="stat-icon chunks"><i class="fa-solid fa-puzzle-piece"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="val-chunks">—</span>
+                                <span class="stat-label">Chunks</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" id="stat-chars">
+                            <div class="stat-icon chars"><i class="fa-solid fa-font"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="val-chars">—</span>
+                                <span class="stat-label">ตัวอักษร</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" id="stat-status">
+                            <div class="stat-icon success"><i class="fa-solid fa-check-circle"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="val-status">—</span>
+                                <span class="stat-label">สถานะ</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='embed.js') }}"></script>
+</body>
+</html>
