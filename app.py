@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from RAG import get_dermatology_response
