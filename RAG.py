@@ -13,14 +13,14 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # ── 1. Configuration ──────────────────────────────────────────────────────────
 
-# LLM (Gemini via KKU)
-LLM_API_KEY  = "sk_8BB2YyFppfr1z8Sk4mEfgc4AWLDTsjR4nXn2gsiUhAMdMWY1Jv1Yquin9EhSgf46"
-LLM_BASE_URL = "https://gen.ai.kku.ac.th/api/v1"
-LLM_MODEL    = "gemini-3.1-pro-preview"
+# LLM (Gemini via KKU) — ใช้ environment variables (ตั้งค่าผ่าน docker-compose)
+LLM_API_KEY  = os.environ.get("LLM_API_KEY",  "sk_8BB2YyFppfr1z8Sk4mEfgc4AWLDTsjR4nXn2gsiUhAMdMWY1Jv1Yquin9EhSgf46")
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://gen.ai.kku.ac.th/api/v1")
+LLM_MODEL    = os.environ.get("LLM_MODEL",    "gemini-3.1-pro-preview")
 
-# Supabase
-SUPABASE_URL = "https://rsocwhsekrnpwuejankb.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzb2N3aHNla3JucHd1ZWphbmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Njk1MDUsImV4cCI6MjA4NzM0NTUwNX0.CPvVpSyXhxSHPhH2Hm_ZHsXdeoxb23pybVhYxhoUwE8"
+# Supabase — ใช้ environment variables (ตั้งค่าผ่าน docker-compose)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://rsocwhsekrnpwuejankb.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzb2N3aHNla3JucHd1ZWphbmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Njk1MDUsImV4cCI6MjA4NzM0NTUwNX0.CPvVpSyXhxSHPhH2Hm_ZHsXdeoxb23pybVhYxhoUwE8")
 TABLE_NAME   = "skin_documents"
 MATCH_FN     = "match_skin_documents"
 
