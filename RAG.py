@@ -260,13 +260,44 @@ def get_dermatology_response(user_query: str) -> str:
 
 # ── 6. Embed new documents ────────────────────────────────────────────────────
 
-def embed_documents(raw_text: str, chunk_size: int = 500, source: str = "upload") -> dict:
+def embed_documents(raw_text: str, chunk_size: int = 500, chunk_overlap: int = 50, source: str = "upload") -> dict:
     """Split and embed new documents into Supabase."""
     if not raw_text or not raw_text.strip():
         raise ValueError("ข้อความว่างเปล่า ไม่สามารถ Embed ได้")
 
-    # Simple chunking by newline
-    chunks = [c.strip() for c in raw_text.strip().split("\n") if c.strip()]
+    if chunk_size <= 0: chunk_size = 500
+    if chunk_overlap < 0: chunk_overlap = 0
+
+    text = raw_text.strip()
+    chunks = []
+    start = 0
+    
+    while start < len(text):
+        end = start + chunk_size
+        
+        if end >= len(text):
+            chunk_text = text[start:].strip()
+            if chunk_text:
+                chunks.append(chunk_text)
+            break
+            
+        break_point = text.rfind('\n', start, end)
+        if break_point == -1 or break_point < start + (chunk_size // 2):
+            break_point = text.rfind(' ', start, end)
+            
+        if break_point == -1 or break_point <= start:
+            break_point = end
+            
+        chunk_text = text[start:break_point].strip()
+        if chunk_text:
+            chunks.append(chunk_text)
+            
+        next_start = break_point - chunk_overlap
+        if next_start <= start:
+            next_start = break_point
+            
+        start = next_start
+
     if not chunks:
         raise ValueError("ไม่สามารถแบ่ง Chunk ได้")
 

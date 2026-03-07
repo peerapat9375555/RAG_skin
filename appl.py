@@ -40,6 +40,7 @@ def chat():
 @app.route('/api/embed', methods=['POST'])
 def embed():
     chunk_size = 500
+    chunk_overlap = 50
 
     # ── Case 1: File upload (multipart/form-data) ──
     if request.files:
@@ -52,6 +53,7 @@ def embed():
             return jsonify({"error": "รองรับเฉพาะไฟล์ .txt เท่านั้น"}), 400
 
         chunk_size = int(request.form.get('chunk_size', 500))
+        chunk_overlap = int(request.form.get('chunk_overlap', 50))
 
         try:
             raw = file.read()
@@ -74,10 +76,11 @@ def embed():
 
         raw_text = data['text']
         chunk_size = int(data.get('chunk_size', 500))
+        chunk_overlap = int(data.get('chunk_overlap', 50))
 
     # ── Embed ──
     try:
-        result = embed_documents(raw_text, chunk_size=chunk_size)
+        result = embed_documents(raw_text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
