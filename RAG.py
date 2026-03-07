@@ -120,12 +120,11 @@ def _seed_if_empty() -> None:
                     if test_vec:
                         new_dim = len(test_vec)
                         if old_dim != new_dim:
-                            print(f"[WARN] Dimension mismatch: old={old_dim}, new={new_dim}. Re-seeding...")
-                            db.table(TABLE_NAME).delete().neq("id", 0).execute()
-                            _seed_if_empty()
+                            print(f"[WARN] Dimension mismatch: old={old_dim}, new={new_dim}. Table needs manual reset or schema update.")
+                            # Prevent infinite recursion by not automatically calling _seed_if_empty() again
                             return
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[WARN] Error in dimension check: {e}")
             print(f"[OK]   Supabase vector DB ready ({count} documents).")
     except Exception as e:
         print(f"[WARN] Could not check/seed DB: {e}")
