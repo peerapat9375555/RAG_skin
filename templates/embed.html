@@ -12,40 +12,24 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo-area">
-                <i class="fa-solid fa-notes-medical logo-icon"></i>
-                <h2>DermaAI</h2>
+    <div class="app-container" style="flex-direction: column;">
+        <!-- Top Nav matching Admin Dashboard -->
+        <header style="display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; background: white; border-bottom: 1px solid var(--border-glass); width: 100%;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <h1 style="font-size: 20px; font-weight: 800; color: #1e293b; letter-spacing: -0.5px;">
+                    AI Skin Assistant 
+                    <span style="color: #117b6f; margin-left: 8px; padding: 2px 8px; background: rgba(17, 123, 111, 0.1); border-radius: 6px; font-size: 14px; border: 1px solid rgba(17, 123, 111, 0.2);">Data Embedding</span>
+                </h1>
             </div>
-            <div class="nav-menu">
-                <a href="/" class="nav-item"><i class="fa-solid fa-message"></i> ปรึกษาใหม่</a>
-                <a href="/embed" class="nav-item active"><i class="fa-solid fa-database"></i> จัดการข้อมูล</a>
-                <a href="#" class="nav-item" onclick="alert('ฟีเจอร์นี้อยู่ระหว่างการพัฒนา')"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติส่วนตัว</a>
-                <a href="/logout" class="nav-item"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</a>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <a href="https://se-nine-gamma.vercel.app" style="color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                    <i class="fa-solid fa-arrow-left"></i> กลับไปหน้าแอดมิน
+                </a>
             </div>
-            <div class="user-profile">
-                <div class="avatar"><i class="fa-solid fa-user"></i></div>
-                <div class="user-info">
-                    <span class="name">Admin</span>
-                    <span class="status"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 4px;"></i>Online</span>
-                </div>
-            </div>
-        </aside>
+        </header>
 
         <!-- Main Embed Area -->
-        <main class="embed-main">
-            <header class="chat-header">
-                <div>
-                    <h1><i class="fa-solid fa-database" style="color: var(--primary); margin-right: 10px; font-size: 18px;"></i>Data Embedding</h1>
-                    <p>อัพโหลดไฟล์หรือพิมพ์ข้อความเพื่อเพิ่มข้อมูลเข้าสู่ฐานข้อมูลความรู้</p>
-                </div>
-                <div class="header-actions">
-                    <button class="action-btn" title="สลับโหมด" onclick="toggleTheme()" id="theme-btn">
-                        <i class="fa-solid fa-sun"></i>
-                    </button>
-                </div>
-            </header>
+        <main class="embed-main" style="padding: 20px 0; max-width: 1200px; margin: 0 auto; width: 100%;">
 
             <div class="embed-content">
                 <!-- Left Panel: Input -->

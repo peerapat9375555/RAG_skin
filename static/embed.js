@@ -7,32 +7,7 @@
 // =============================================
 //  THEME (shared with main page)
 // =============================================
-(function initTheme() {
-    const saved = localStorage.getItem('derma-theme');
-    if (saved) document.documentElement.setAttribute('data-theme', saved);
-    updateThemeIcon();
-})();
-
-function toggleTheme() {
-    const html = document.documentElement;
-    const current = html.getAttribute('data-theme');
-    const next = current === 'light' ? 'dark' : 'light';
-    if (next === 'dark') {
-        html.removeAttribute('data-theme');
-        localStorage.removeItem('derma-theme');
-    } else {
-        html.setAttribute('data-theme', 'light');
-        localStorage.setItem('derma-theme', 'light');
-    }
-    updateThemeIcon();
-}
-
-function updateThemeIcon() {
-    const btn = document.getElementById('theme-btn');
-    if (!btn) return;
-    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-    btn.querySelector('i').className = isLight ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
-}
+// Theme toggle removed to match Admin Dashboard color scheme.
 
 // =============================================
 //  STATE
