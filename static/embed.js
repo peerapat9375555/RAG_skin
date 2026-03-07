@@ -100,11 +100,60 @@ function removeFile() {
 }
 
 // =============================================
-//  TEXT INPUT
+//  TEXT INPUT / QUILL EDITOR
 // =============================================
+let quill;
+
+window.addEventListener('DOMContentLoaded', () => {
+    // Initialize Quill editor
+    quill = new Quill('#editor-container', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                ['bold', 'italic', 'underline'],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                ['clean']
+            ]
+        },
+        placeholder: 'พิมพ์หรือวางข้อความที่ต้องการเพิ่มเข้าฐานข้อมูลที่นี่...\n\nเช่น: โรคผื่นภูมิแพ้ผิวหนัง (Atopic Dermatitis) มักมีอาการผิวแห้ง คันมาก และมีผื่นแดงตามข้อพับ'
+    });
+
+    quill.on('text-change', () => {
+        updateTextPreview();
+    });
+});
+
 function updateTextPreview() {
-    const txt = document.getElementById('text-input').value;
-    const charCount = txt.length;
+    // Extract raw text but Quill includes newlines for lists
+    // However, it doesn't add the bullet symbols natively to getText(), we must simulate it if we want the LLM to see it.
+    // To feed the LLM good chunks, we will grab the raw text but ensure list formatting translates to text dashes.
+    
+    let el = document.createElement('div');
+    el.innerHTML = quill.root.innerHTML;
+    
+    // Replace li tags with text equivalents for LLM
+    let listItems = el.querySelectorAll('li');
+    listItems.forEach(li => {
+        let text = li.textContent;
+        // Determine type of list
+        if (li.parentNode.tagName === 'OL') {
+            let index = Array.from(li.parentNode.children).indexOf(li) + 1;
+            li.textContent = `\n${index}. ${text}`;
+        } else {
+            li.textContent = `\n- ${text}`;
+        }
+    });
+
+    // Replace p tags with newlines
+    let pTags = el.querySelectorAll('p');
+    pTags.forEach(p => {
+        p.textContent = p.textContent + '\n';
+    });
+
+    const txt = el.textContent;
+    document.getElementById('text-input').value = txt; // Save formatted raw string to hidden input
+    
+    const charCount = txt.trim().length;
     const wordCount = txt.trim() ? txt.trim().split(/\s+/).length : 0;
 
     document.getElementById('char-count').textContent = charCount.toLocaleString() + ' ตัวอักษร';
@@ -151,6 +200,9 @@ function clearPreview() {
     if (activeTab === 'file') {
         removeFile();
     } else {
+        if (quill) {
+            quill.setText('');
+        }
         document.getElementById('text-input').value = '';
         updateTextPreview();
     }
