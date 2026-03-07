@@ -6,6 +6,7 @@ LLM: Gemini via KKU AI Gateway
 """
 
 import os
+import json
 import requests
 import google.generativeai as genai
 from openai import OpenAI
@@ -115,7 +116,8 @@ def _seed_if_empty() -> None:
             try:
                 sample = db.table(TABLE_NAME).select("embedding").limit(1).execute()
                 if sample.data and sample.data[0].get("embedding"):
-                    old_dim = len(sample.data[0]["embedding"])
+                    old_emb = sample.data[0]["embedding"]
+                    old_dim = len(json.loads(old_emb)) if isinstance(old_emb, str) else len(old_emb)
                     test_vec = _embed("test")
                     if test_vec:
                         new_dim = len(test_vec)
@@ -172,9 +174,11 @@ def _rerank(query: str, documents: list[dict], top_n: int = 4) -> list[dict]:
         )
 
         # แปลงคำตอบเป็น index
-        answer = response.choices[0].message.content.strip()
+        raw_content = response.choices[0].message.content
+        answer = (raw_content or "").strip()
         indices = []
         for part in answer.replace(" ", "").split(","):
+            if not part: continue
             try:
                 idx = int(part) - 1  # convert 1-indexed to 0-indexed
                 if 0 <= idx < len(documents) and idx not in indices:
