@@ -154,17 +154,13 @@ def _rerank(query: str, documents: list[dict], top_n: int = 4) -> list[dict]:
         f"[{i+1}] {d['content']}" for i, d in enumerate(documents)
     ])
 
-    rerank_prompt = f"""คุณคือผู้เชี่ยวชาญด้านการจัดอันดับเอกสาร
-กรุณาจัดอันดับเอกสารด้านล่างตามความเกี่ยวข้องกับคำถามของผู้ใช้
-ตอบเฉพาะหมายเลขของเอกสาร {top_n} อันดับแรกที่เกี่ยวข้องมากที่สุด คั่นด้วยเครื่องหมายจุลภาค
-ตัวอย่าง: 3,1,5,2
+    rerank_prompt = f"""คุณคือ AI จัดอันดับข้อมูล
+เลือกลำดับเอกสาร {top_n} อันดับแรกที่ตรงกับคำถามที่สุด
+ตอบเฉพาะเลข คั่นด้วยลูกน้ำ (เช่น 2,1,3)
 
 คำถาม: {query}
-
 เอกสาร:
-{doc_list}
-
-ตอบเฉพาะหมายเลข {top_n} อันดับแรก (คั่นด้วย ,):"""
+{doc_list}"""
 
     try:
         response = rerank_client.chat.completions.create(
@@ -172,7 +168,7 @@ def _rerank(query: str, documents: list[dict], top_n: int = 4) -> list[dict]:
             messages=[{"role": "user", "content": rerank_prompt}],
             stream=False,
             temperature=0.0,
-            max_tokens=50
+            max_tokens=30
         )
 
         # แปลงคำตอบเป็น index
@@ -198,17 +194,28 @@ def _rerank(query: str, documents: list[dict], top_n: int = 4) -> list[dict]:
     return documents[:top_n]
 
 
-def get_dermatology_response(user_query: str) -> str:
-    """RAG pipeline: embed query → vector search → rerank → LLM generate."""
+def _is_greeting(query: str) -> bool:
+    """Stage 1: Fast Query Router to check if the user is just greeting."""
+    greetings = ["สวัสดี", "ดีจ้า", "ทดสอบ", "เทส", "hello", "hi", "test", "ทำอะไรได้บ้าง"]
+    q_clean = query.strip().lower()
+    return any(q_clean == g or q_clean.startswith(g + " ") for g in greetings)
+
+
+def get_dermatology_response(user_query: str):
+    """Multi-Stage RAG pipeline: Router → Retrieve → Hybrid → Rerank → Stream Gen."""
     _ensure_seeded()
 
     if not user_query or not str(user_query).strip():
-        return "กรุณาพิมพ์คำถามของคุณค่ะ"
+        yield "กรุณาพิมพ์คำถามของคุณค่ะ"
+        return
 
-    # (a) Embed query via API
+    # Stage 1: Query Router
+    if _is_greeting(user_query):
+        yield "สวัสดีค่ะ ดิฉันคือผู้ช่วยอัจฉริยะด้านโรคผิวหนัง มีอะไรให้ดิฉันช่วยไหมคะ?"
+        return
+
+    # Stage 2: Vector Retrieval
     query_vector = _embed(user_query)
-
-    # (b) Retrieve from Supabase (ดึง 8 อัน สำหรับ reranking)
     docs = []
     if query_vector:
         try:
@@ -216,7 +223,7 @@ def get_dermatology_response(user_query: str) -> str:
                 MATCH_FN,
                 {
                     "query_embedding": query_vector,
-                    "match_count":     8,
+                    "match_count":     15, # ดึงมาก่อน 15 อันดับ
                     "match_threshold": 0.15,
                 }
             ).execute()
@@ -224,17 +231,32 @@ def get_dermatology_response(user_query: str) -> str:
         except Exception as e:
             print(f"[WARN] Supabase retrieval error: {e}")
 
-    # (c) Reranking — เลือก 4 อันที่เกี่ยวข้องที่สุด
+    # Stage 2.5: Filter / Hybrid Search
     if docs:
-        reranked_docs = _rerank(user_query, docs, top_n=4)
+        query_terms = [t.strip() for t in user_query.split() if len(t.strip()) > 2]
+        for d in docs:
+            lexical_boost = 0.0
+            content_lower = d['content'].lower()
+            for term in query_terms:
+                if term.lower() in content_lower:
+                    lexical_boost += 0.05 # เพิ่มคะแนนให้ถ้ามี keyword ตรงกัน
+            d['hybrid_score'] = d.get('similarity', 0.0) + lexical_boost
+        
+        # คัดกรองให้เหลือ 6 อันดับที่มีคะแนนผสมสูงสุด
+        docs.sort(key=lambda x: x.get('hybrid_score', 0.0), reverse=True)
+        docs = docs[:6]
+
+    # Stage 3: Reranking (ให้ AI คัดให้เหลือ 3 อันดับสุดยอด)
+    if docs:
+        reranked_docs = _rerank(user_query, docs, top_n=3)
         context = "\n".join([f"- {d['content']}" for d in reranked_docs])
     elif not query_vector:
-        # Fallback: use all seed documents if embedding fails
+        # Fallback
         context = "\n".join([f"- {doc}" for doc in _INITIAL_DOCUMENTS])
     else:
         context = "(ไม่พบข้อมูลที่เกี่ยวข้องในฐานข้อมูล)"
 
-    # (d) Generate with LLM
+    # Stage 4: Streaming Generation
     system_prompt = f"""คุณคือผู้ช่วยอัจฉริยะด้านโรคผิวหนัง
 จงตอบคำถามโดยอ้างอิงและใช้ข้อมูลที่ให้มาใน "ข้อมูลอ้างอิง" เป็นหลัก
 หากผู้ใช้ถามหาวิธีรักษาหรือดูแล ให้สรุปขั้นตอนเป็นข้อๆ ให้เข้าใจง่าย
@@ -251,11 +273,14 @@ def get_dermatology_response(user_query: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_query},
         ],
-        stream=False,
+        stream=True,
         temperature=0.1
     )
 
-    return response.choices[0].message.content
+    for chunk in response:
+        delta = chunk.choices[0].delta.content if chunk.choices else None
+        if delta:
+            yield delta
 
 
 # ── 6. Embed new documents ────────────────────────────────────────────────────

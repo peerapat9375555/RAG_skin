@@ -24,14 +24,17 @@ def embed_page():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    from flask import Response, stream_with_context
     data = request.json
     user_message = data.get('message')
     if not user_message:
         return jsonify({"error": "No message provided"}), 400
 
     try:
-        response = get_dermatology_response(user_message)
-        return jsonify({"reply": response})
+        def generate():
+            for chunk in get_dermatology_response(user_message):
+                yield chunk
+        return Response(stream_with_context(generate()), mimetype='text/plain')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
