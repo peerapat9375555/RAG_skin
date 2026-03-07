@@ -46,7 +46,6 @@
 
 1. **Embedding (Google Gemini):**
    - รับคำถามผู้ใช้ ไปแปลงเป็นเวกเตอร์ (768 มิติ) ผ่าน `text-embedding-004`
-   - _ใช้คีย์: `EMBED_API_KEY` (Google AI Studio)_
 
 2. **Vector Retrieval (Supabase pgvector):**
    - นำเวกเตอร์ไปค้นหาเอกสารที่มีความหมายใกล้เคียงที่สุดใน Supabase
@@ -55,12 +54,10 @@
 3. **Reranking (KKU LLM):**
    - ส่ง 8 เอกสาร พร้อมคำถาม ไปให้ LLM (Gemini) ช่วย **ให้คะแนน (Score)** ความเกี่ยวข้อง
    - คัดกรองและเลือกเฉพาพ **4 เอกสารที่ตอบตรงคำถามที่สุด**
-   - _ใช้คีย์: `RERANK_API_KEY` (KKU Gateway)_
 
 4. **Generation (KKU LLM):**
    - นำ 4 เอกสารสุดท้าย ป้อนเป็น `Context` (ข้อมูลอ้างอิง) ให้ LLM อ่าน
    - สั่งให้ LLM คัดลอก/สรุปเนื้อหาจาก Context เพื่อตอบคำถามผู้ใช้
-   - _ใช้คีย์: `LLM_API_KEY` (KKU Gateway)_
 
 - **Endpoint หลัก:** `POST /api/chat` , `POST /api/embed`
 
