@@ -78,28 +78,122 @@
 ## 🔗 ภาพรวมการไหลของข้อมูล (Data Flow)
 
 ```mermaid
-graph TD;
-    User((User)) -->|Upload Image| Frontend;
-    User -->|Type Message| Frontend;
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'edgeLabelBackground':'#e8e8e8', 'tertiaryColor': '#f4f4f4'}}}%%
+graph TD
 
-    Frontend -->|POST picture\n(VITE_MODEL_URL)| Model_Service[Model Service\n(ONNX Runtime)];
-    Model_Service -->|Return Risk %| Frontend;
+    %% ----------------------------------------------------
+    %% User Layer
+    %% ----------------------------------------------------
+    subgraph UserSpace ["👥 User Space"]
+        User(("👤 User\n(Mobile / Web)"))
+    end
 
-    Frontend -->|POST message\n(VITE_CHATBOT_URL)| Chatbot_Service[Chatbot Service\n(RAG Pipeline)];
+    %% ----------------------------------------------------
+    %% Frontend Layer
+    %% ----------------------------------------------------
+    subgraph Vercel ["⚡ Vercel (Frontend Service)"]
+        UI["💻 React Vite App\n(dermaai.vercel.app)"]
+        UI_Img[/"📤 Upload Image"/]
+        UI_Chat[/"💬 Chat Query"/]
 
-    Chatbot_Service -->|1. Request Vector| Gemini_API((Google\nGemini API));
-    Gemini_API -->|2. Return 768-dim Vector| Chatbot_Service;
+        UI --- UI_Img
+        UI --- UI_Chat
+    end
 
-    Chatbot_Service -->|3. Cosine Search| Supabase[(Supabase\npgvector)];
-    Supabase -->|4. Return 8 Docs| Chatbot_Service;
+    %% ----------------------------------------------------
+    %% Backend Layer (Render)
+    %% ----------------------------------------------------
+    subgraph Render ["☁️ Render (Backend Microservices)"]
 
-    Chatbot_Service -->|5. Rerank 8 Docs| KKU_API_1((KKU Gateway\nAPI Key 2));
-    KKU_API_1 -->|6. Return Top 4| Chatbot_Service;
+        %% Service 1: Model
+        subgraph ModelService ["🧠 Model Service (peerapat9375555/SE)"]
+            API1["API: /api/predict"]
+            ONNX[{"⚙️ ONNX Runtime\n(CPU Inference)"}]
+            API1 --> ONNX
+        end
 
-    Chatbot_Service -->|7. Generate Answer\n(using Top 4)| KKU_API_2((KKU Gateway\nAPI Key 1));
-    KKU_API_2 -->|8. Final Answer| Chatbot_Service;
+        %% Service 2: Chatbot (RAG)
+        subgraph ChatbotService ["🤖 Chatbot Service (peerapat9375555/RAG_skin)"]
+            API2["API: /api/chat"]
 
-    Chatbot_Service -->|Send Text Reply| Frontend;
+            subgraph RAGipeline ["⚡ RAG Pipeline"]
+                EmbedProcess["1️⃣ Embedding\n(Text ➡️ Vector)"]
+                SearchProcess["2️⃣ Vector Retrieval\n(Fetch Top-8)"]
+                RerankProcess["3️⃣ LLM Reranking\n(Select Top-4)"]
+                GenProcess["4️⃣ Generation\n(Context + Prompt)"]
+
+                EmbedProcess --> SearchProcess
+                SearchProcess --> RerankProcess
+                RerankProcess --> GenProcess
+            end
+
+            API2 --> EmbedProcess
+        end
+    end
+
+    %% ----------------------------------------------------
+    %% External APIs & Databases
+    %% ----------------------------------------------------
+    subgraph External ["🌐 External APIs & Storage"]
+
+        SupaDB[("🗄️ Supabase DB\n(pgvector)")]
+
+        subgraph GoogleAPI ["🔹 Google AI Studio"]
+            GeminiEmbed(("Gemini\ntext-embedding-004"))
+        end
+
+        subgraph KKUAPI ["🔹 KKU AI Gateway"]
+            KKURerank(("Gemini\ngemini-3.1-pro-preview\n(Key 2: Rerank)"))
+            KKUGen(("Gemini\ngemini-3.1-pro-preview\n(Key 1: LLM)"))
+        end
+    end
+
+    %% ----------------------------------------------------
+    %% Data Flow Connections
+    %% ----------------------------------------------------
+
+    %% User to Frontend
+    User == "Uses" ==> UI
+
+    %% Frontend to Backends
+    UI_Img -- "POST Image\n(VITE_MODEL_URL)" --> API1
+    UI_Chat -- "POST Message\n(VITE_CHATBOT_URL)" --> API2
+
+    %% Model Return
+    ONNX -. "Return Risk %" .-> UI_Img
+
+    %% RAG Pipeline Flow
+    EmbedProcess -- "Request Vector\n[EMBED_API_KEY]" --> GeminiEmbed
+    GeminiEmbed -. "Return 768-dim Vector" .-> SearchProcess
+
+    SearchProcess -- "Cosine Similarity Search" --> SupaDB
+    SupaDB -. "Return 8 Candidate Docs" .-> RerankProcess
+
+    RerankProcess -- "Send 8 Docs for Scoring\n[RERANK_API_KEY]" --> KKURerank
+    KKURerank -. "Return Selected Top 4 Docs" .-> GenProcess
+
+    GenProcess -- "Send System Prompt + Top 4 Docs\n[LLM_API_KEY]" --> KKUGen
+    KKUGen -. "Return Final Answer Text" .-> API2
+
+    %% Final Return
+    API2 -. "Display Response" .-> UI_Chat
+
+    %% ----------------------------------------------------
+    %% Styling
+    %% ----------------------------------------------------
+    classDef frontend fill:#000000,stroke:#333,stroke-width:2px,color:#fff;
+    classDef model fill:#1b4f72,stroke:#2874a6,stroke-width:2px,color:#fff;
+    classDef chatbot fill:#145a32,stroke:#1d8348,stroke-width:2px,color:#fff;
+    classDef api fill:#b03a2e,stroke:#cb4335,stroke-width:2px,color:#fff;
+    classDef db fill:#b7950b,stroke:#d4ac0d,stroke-width:2px,color:#fff;
+    classDef process fill:#eaf2f8,stroke:#5dade2,stroke-width:1px,color:#333;
+
+    class UI frontend;
+    class API1,ONNX model;
+    class API2 chatbot;
+    class EmbedProcess,SearchProcess,RerankProcess,GenProcess process;
+    class GeminiEmbed,KKURerank,KKUGen api;
+    class SupaDB db;
 ```
 
 ---
