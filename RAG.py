@@ -1,24 +1,27 @@
 """
 RAG.py — Retrieval-Augmented Generation for DermaAI
-Vector Database: Supabase + pgvector (HNSW index)
-Embedding Model: intfloat/multilingual-e5-small (384-dim, multilingual)
+Vector Database: Supabase + pgvector
+Embedding: via OpenAI-compatible API (no local model — saves RAM)
 LLM: Gemini via KKU AI Gateway
 """
 
 import os
+import requests
 from openai import OpenAI
 from supabase import create_client, Client
-from langchain_text_splitters import CharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # ── 1. Configuration ──────────────────────────────────────────────────────────
 
-# LLM (Gemini via KKU) — ใช้ environment variables (ตั้งค่าผ่าน docker-compose)
 LLM_API_KEY  = os.environ.get("LLM_API_KEY",  "sk_8BB2YyFppfr1z8Sk4mEfgc4AWLDTsjR4nXn2gsiUhAMdMWY1Jv1Yquin9EhSgf46")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://gen.ai.kku.ac.th/api/v1")
 LLM_MODEL    = os.environ.get("LLM_MODEL",    "gemini-3.1-pro-preview")
 
-# Supabase — ใช้ environment variables (ตั้งค่าผ่าน docker-compose)
+# Embedding API — ใช้ API แทนการโหลดโมเดลในเครื่อง (ประหยัด RAM)
+EMBED_API_KEY  = os.environ.get("EMBED_API_KEY",  LLM_API_KEY)
+EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", LLM_BASE_URL)
+EMBED_MODEL    = os.environ.get("EMBED_MODEL",    "bge-m3")
+
+# Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://rsocwhsekrnpwuejankb.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzb2N3aHNla3JucHd1ZWphbmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Njk1MDUsImV4cCI6MjA4NzM0NTUwNX0.CPvVpSyXhxSHPhH2Hm_ZHsXdeoxb23pybVhYxhoUwE8")
 TABLE_NAME   = "skin_documents"
@@ -27,35 +30,39 @@ MATCH_FN     = "match_skin_documents"
 # ── 2. Initialise clients ─────────────────────────────────────────────────────
 
 llm_client: OpenAI  = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
-db: Client          = create_client(SUPABASE_URL, SUPABASE_KEY)
+embed_client: OpenAI = OpenAI(api_key=EMBED_API_KEY, base_url=EMBED_BASE_URL)
+db: Client           = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ── 3. Embedding model (lazy loading — โหลดตอนใช้ครั้งแรก) ───────────────────
-_embed_model = None
-
-
-def _get_embed_model():
-    """Lazy-load the embedding model on first use (saves startup RAM/time)."""
-    global _embed_model
-    if _embed_model is None:
-        print("[INFO] Loading embedding model intfloat/multilingual-e5-small ...")
-        _embed_model = HuggingFaceEmbeddings(
-            model_name="intfloat/multilingual-e5-small"
-        )
-        print("[OK]   Embedding model ready.")
-    return _embed_model
-
+# ── 3. Embedding via API ──────────────────────────────────────────────────────
 
 def _embed(text: str) -> list[float]:
-    """Return 384-dim embedding vector for a single text."""
-    return _get_embed_model().embed_query(text)
+    """Get embedding vector via API (no local model needed)."""
+    try:
+        response = embed_client.embeddings.create(
+            model=EMBED_MODEL,
+            input=text
+        )
+        return response.data[0].embedding
+    except Exception as e:
+        print(f"[WARN] Embedding API error: {e}")
+        return []
 
 
 def _embed_many(texts: list[str]) -> list[list[float]]:
-    """Return embedding vectors for a list of texts (batched)."""
-    return _get_embed_model().embed_documents(texts)
+    """Get embedding vectors for multiple texts via API."""
+    try:
+        response = embed_client.embeddings.create(
+            model=EMBED_MODEL,
+            input=texts
+        )
+        return [item.embedding for item in response.data]
+    except Exception as e:
+        print(f"[WARN] Embedding API error: {e}")
+        return [[] for _ in texts]
 
 
-# ── 4. Seed initial knowledge (only when DB is empty) ────────────────────────
+# ── 4. Seed initial knowledge ─────────────────────────────────────────────────
+
 _INITIAL_DOCUMENTS = [
     "โรคผื่นภูมิแพ้ผิวหนัง (Atopic Dermatitis) มักมีอาการผิวแห้ง คันมาก และมีผื่นแดงตามข้อพับ",
     "โรคสะเก็ดเงิน (Psoriasis) เป็นโรคอุบัติซ้ำที่มีผื่นหนา ขอบชัด มีสะเก็ดสีเงิน มักพบบริเวณข้อศอกและหัวเข่า",
@@ -81,6 +88,9 @@ def _seed_if_empty() -> None:
         if count == 0:
             print("[INFO] Seeding initial knowledge base into Supabase ...")
             vectors = _embed_many(_INITIAL_DOCUMENTS)
+            if not vectors or not vectors[0]:
+                print("[WARN] Embedding API returned empty vectors. Skipping seed.")
+                return
             rows = [
                 {
                     "content":   doc,
@@ -93,20 +103,6 @@ def _seed_if_empty() -> None:
             db.table(TABLE_NAME).insert(rows).execute()
             print(f"[OK]   Seeded {len(_INITIAL_DOCUMENTS)} initial documents.")
         else:
-            # ตรวจสอบ dimension ของ embedding เก่า กับตัวใหม่ว่าตรงกันไหม
-            try:
-                sample = db.table(TABLE_NAME).select("embedding").limit(1).execute()
-                if sample.data and sample.data[0].get("embedding"):
-                    old_dim = len(sample.data[0]["embedding"])
-                    test_vec = _embed("test")
-                    new_dim = len(test_vec)
-                    if old_dim != new_dim:
-                        print(f"[WARN] Dimension mismatch: old={old_dim}, new={new_dim}. Re-seeding...")
-                        db.table(TABLE_NAME).delete().neq("id", 0).execute()
-                        _seed_if_empty()  # recurse after clearing
-                        return
-            except Exception:
-                pass
             print(f"[OK]   Supabase vector DB ready ({count} documents).")
     except Exception as e:
         print(f"[WARN] Could not check/seed DB: {e}")
@@ -114,12 +110,9 @@ def _seed_if_empty() -> None:
 
 # ── 5. Core RAG function ──────────────────────────────────────────────────────
 
-# Deferred seeding — จะ seed ตอนมี request แรกเข้ามา (ไม่ seed ตอน import)
 _seeded = False
 
-
 def _ensure_seeded():
-    """Seed the database on first request (not at import time)."""
     global _seeded
     if not _seeded:
         _seed_if_empty()
@@ -127,40 +120,35 @@ def _ensure_seeded():
 
 
 def get_dermatology_response(user_query: str) -> str:
-    """
-    Retrieval-Augmented Generation pipeline:
-      1. Embed the user query
-      2. Similarity search in Supabase (pgvector HNSW)
-      3. Build context from top-k matches
-      4. Send to LLM with system prompt
-    """
+    """RAG pipeline: embed query → vector search → LLM generate."""
     _ensure_seeded()
 
     if not user_query or not str(user_query).strip():
         return "กรุณาพิมพ์คำถามของคุณค่ะ"
 
-    # (a) Embed query
+    # (a) Embed query via API
     query_vector = _embed(user_query)
 
-    # (b) Retrieve from Supabase using the match_skin_documents RPC
-    try:
-        result = db.rpc(
-            MATCH_FN,
-            {
-                "query_embedding": query_vector,
-                "match_count":     4,
-                "match_threshold": 0.2,
-            }
-        ).execute()
-        docs = result.data or []
-    except Exception as e:
-        print(f"[WARN] Supabase retrieval error: {e}")
-        docs = []
-
-    if docs:
-        context = "\n".join([f"- {d['content']}" for d in docs])
+    # (b) Retrieve from Supabase
+    context = "(ไม่พบข้อมูลที่เกี่ยวข้องในฐานข้อมูล)"
+    if query_vector:
+        try:
+            result = db.rpc(
+                MATCH_FN,
+                {
+                    "query_embedding": query_vector,
+                    "match_count":     4,
+                    "match_threshold": 0.2,
+                }
+            ).execute()
+            docs = result.data or []
+            if docs:
+                context = "\n".join([f"- {d['content']}" for d in docs])
+        except Exception as e:
+            print(f"[WARN] Supabase retrieval error: {e}")
     else:
-        context = "(ไม่พบข้อมูลที่เกี่ยวข้องในฐานข้อมูล)"
+        # Fallback: use all seed documents as context if embedding fails
+        context = "\n".join([f"- {doc}" for doc in _INITIAL_DOCUMENTS])
 
     # (c) Generate with LLM
     system_prompt = f"""คุณคือผู้ช่วยอัจฉริยะด้านโรคผิวหนัง
@@ -188,70 +176,41 @@ def get_dermatology_response(user_query: str) -> str:
 
 # ── 6. Embed new documents ────────────────────────────────────────────────────
 
-def embed_documents(
-    raw_text:      str,
-    chunk_size:    int = 500,
-    chunk_overlap: int = 50,
-    source:        str = "upload"
-) -> dict:
-    """
-    Split raw_text into chunks, embed each, and upsert into Supabase.
-
-    Returns:
-        {"chunks_added": int, "total_chars": int, "message": str}
-    """
+def embed_documents(raw_text: str, chunk_size: int = 500, source: str = "upload") -> dict:
+    """Split and embed new documents into Supabase."""
     if not raw_text or not raw_text.strip():
         raise ValueError("ข้อความว่างเปล่า ไม่สามารถ Embed ได้")
 
-    # Validate params
-    chunk_size    = max(50,  min(chunk_size,    5000))
-    chunk_overlap = max(0,   min(chunk_overlap, chunk_size // 2))
-
-    # Split
-    splitter = CharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separator="\n",
-    )
-    chunks = splitter.split_text(raw_text.strip())
+    # Simple chunking by newline
+    chunks = [c.strip() for c in raw_text.strip().split("\n") if c.strip()]
     if not chunks:
-        raise ValueError("ไม่สามารถแบ่ง Chunk ได้ — กรุณาตรวจสอบข้อความอีกครั้ง")
+        raise ValueError("ไม่สามารถแบ่ง Chunk ได้")
 
-    # Batch embed
-    print(f"[INFO] Embedding {len(chunks)} chunks with multilingual-e5-small ...")
     vectors = _embed_many(chunks)
+    if not vectors or not vectors[0]:
+        raise ValueError("Embedding API ไม่สามารถสร้าง vector ได้")
 
-    # Insert into Supabase
     rows = [
         {
             "content":   chunk,
             "embedding": vector,
             "source":    source,
-            "metadata":  {
-                "chunk_index":  i,
-                "chunk_count":  len(chunks),
-                "chunk_size":   chunk_size,
-                "overlap":      chunk_overlap,
-                "total_chars":  len(raw_text),
-            }
+            "metadata":  {"chunk_index": i, "chunk_count": len(chunks)},
         }
         for i, (chunk, vector) in enumerate(zip(chunks, vectors))
     ]
 
     db.table(TABLE_NAME).insert(rows).execute()
-
-    print(f"[OK]   Inserted {len(chunks)} chunks into Supabase ({len(raw_text)} chars total).")
-
     return {
         "chunks_added": len(chunks),
         "total_chars":  len(raw_text),
-        "message":      f"เพิ่ม {len(chunks)} chunks เข้าฐานข้อมูล Supabase สำเร็จ"
+        "message":      f"เพิ่ม {len(chunks)} chunks สำเร็จ"
     }
 
 
 # ── 7. CLI test ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("--- DermaAI RAG System (Supabase + pgvector) ---")
+    print("--- DermaAI RAG System ---")
     _ensure_seeded()
     while True:
         query = input("สอบถาม (exit เพื่อออก): ")
