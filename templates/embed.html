@@ -9,9 +9,59 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='embed.css') }}">
+    <style>
+        /* Force Teal/White Theme Overrides to defeat browser cache */
+        :root, [data-theme="light"], body {
+            --bg-main: #f8f9fa !important;
+            --bg-sidebar: #ffffff !important;
+            --bg-glass: rgba(255, 255, 255, 0.9) !important;
+            --border-glass: #e2e8f0 !important;
+            --primary: #117b6f !important;
+            --primary-glow: rgba(17, 123, 111, 0.2) !important;
+            --primary-light: #149688 !important;
+            --text-primary: #1e293b !important;
+            --text-secondary: #64748b !important;
+            --msg-bot: #ffffff !important;
+            --msg-user: linear-gradient(135deg, #117b6f 0%, #0d5f56 100%) !important;
+        }
+        
+        body {
+            background-color: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+            background: none !important; /* Remove dark radial gradients if any */
+        }
+        
+        .embed-main {
+            background: none !important;
+            background-color: var(--bg-main) !important;
+        }
+        
+        .embed-panel, .text-input-wrapper textarea, .option-input, .preview-box, .status-log, .stat-card, .dropzone {
+            background-color: #ffffff !important;
+            border-color: var(--border-glass) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #117b6f 0%, #149688 100%) !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(17, 123, 111, 0.2) !important;
+        }
+
+        .embed-btn {
+            background: linear-gradient(135deg, #117b6f 0%, #149688 100%) !important;
+            color: white !important;
+            box-shadow: 0 4px 15px rgba(17, 123, 111, 0.2) !important;
+        }
+
+        .embed-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #149688 0%, #117b6f 100%) !important;
+            box-shadow: 0 8px 25px rgba(17, 123, 111, 0.4) !important;
+        }
+    </style>
 </head>
 <body>
-    <div class="app-container">
+    <div class="app-container" style="flex-direction: column; background-color: #f8f9fa;">
     <div class="app-container" style="flex-direction: column;">
         <!-- Top Nav matching Admin Dashboard -->
         <header style="display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; background: white; border-bottom: 1px solid var(--border-glass); width: 100%;">
