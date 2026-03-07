@@ -19,7 +19,7 @@ LLM_MODEL    = os.environ.get("LLM_MODEL",    "gemini-3.1-pro-preview")
 
 # Embedding API — ใช้ Google Gemini Embedding (ประหยัด RAM, ไม่ต้องโหลดโมเดล)
 EMBED_API_KEY  = os.environ.get("EMBED_API_KEY",  "")
-EMBED_MODEL    = os.environ.get("EMBED_MODEL",    "models/embedding-001")
+EMBED_MODEL    = os.environ.get("EMBED_MODEL", "models/gemini-embedding-001")
 
 # Reranking — ใช้ KKU API key อีกอัน สำหรับ Reranking โดยเฉพาะ
 RERANK_API_KEY  = os.environ.get("RERANK_API_KEY",  LLM_API_KEY)
