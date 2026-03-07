@@ -21,6 +21,11 @@ EMBED_API_KEY  = os.environ.get("EMBED_API_KEY",  "")
 EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
 EMBED_MODEL    = os.environ.get("EMBED_MODEL",    "text-embedding-004")
 
+# Reranking — ใช้ KKU API key อีกอัน สำหรับ Reranking โดยเฉพาะ
+RERANK_API_KEY  = os.environ.get("RERANK_API_KEY",  LLM_API_KEY)
+RERANK_BASE_URL = os.environ.get("RERANK_BASE_URL", LLM_BASE_URL)
+RERANK_MODEL    = os.environ.get("RERANK_MODEL",    LLM_MODEL)
+
 # Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://rsocwhsekrnpwuejankb.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzb2N3aHNla3JucHd1ZWphbmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Njk1MDUsImV4cCI6MjA4NzM0NTUwNX0.CPvVpSyXhxSHPhH2Hm_ZHsXdeoxb23pybVhYxhoUwE8")
@@ -29,9 +34,10 @@ MATCH_FN     = "match_skin_documents"
 
 # ── 2. Initialise clients ─────────────────────────────────────────────────────
 
-llm_client: OpenAI  = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
-embed_client: OpenAI = OpenAI(api_key=EMBED_API_KEY, base_url=EMBED_BASE_URL)
-db: Client           = create_client(SUPABASE_URL, SUPABASE_KEY)
+llm_client: OpenAI    = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
+embed_client: OpenAI  = OpenAI(api_key=EMBED_API_KEY, base_url=EMBED_BASE_URL)
+rerank_client: OpenAI = OpenAI(api_key=RERANK_API_KEY, base_url=RERANK_BASE_URL)
+db: Client            = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ── 3. Embedding via API ──────────────────────────────────────────────────────
 
@@ -160,8 +166,8 @@ def _rerank(query: str, documents: list[dict], top_n: int = 4) -> list[dict]:
 ตอบเฉพาะหมายเลข {top_n} อันดับแรก (คั่นด้วย ,):"""
 
     try:
-        response = llm_client.chat.completions.create(
-            model=LLM_MODEL,
+        response = rerank_client.chat.completions.create(
+            model=RERANK_MODEL,
             messages=[{"role": "user", "content": rerank_prompt}],
             stream=False,
             temperature=0.0,
