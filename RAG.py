@@ -1,7 +1,7 @@
 """
 RAG.py — Retrieval-Augmented Generation for DermaAI
 Vector Database: Supabase + pgvector
-Embedding: via OpenAI-compatible API (no local model — saves RAM)
+Embedding: Google Gemini text-embedding-004 (768-dim, via API)
 LLM: Gemini via KKU AI Gateway
 """
 
@@ -16,10 +16,10 @@ LLM_API_KEY  = os.environ.get("LLM_API_KEY",  "sk_8BB2YyFppfr1z8Sk4mEfgc4AWLDTsj
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://gen.ai.kku.ac.th/api/v1")
 LLM_MODEL    = os.environ.get("LLM_MODEL",    "gemini-3.1-pro-preview")
 
-# Embedding API — ใช้ API แทนการโหลดโมเดลในเครื่อง (ประหยัด RAM)
-EMBED_API_KEY  = os.environ.get("EMBED_API_KEY",  LLM_API_KEY)
-EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", LLM_BASE_URL)
-EMBED_MODEL    = os.environ.get("EMBED_MODEL",    "bge-m3")
+# Embedding API — ใช้ Google Gemini Embedding (ประหยัด RAM, ไม่ต้องโหลดโมเดล)
+EMBED_API_KEY  = os.environ.get("EMBED_API_KEY",  "")
+EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+EMBED_MODEL    = os.environ.get("EMBED_MODEL",    "text-embedding-004")
 
 # Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://rsocwhsekrnpwuejankb.supabase.co")
@@ -103,6 +103,21 @@ def _seed_if_empty() -> None:
             db.table(TABLE_NAME).insert(rows).execute()
             print(f"[OK]   Seeded {len(_INITIAL_DOCUMENTS)} initial documents.")
         else:
+            # ตรวจสอบ dimension ให้ตรงกัน — ถ้าไม่ตรงจะ reseed ใหม่
+            try:
+                sample = db.table(TABLE_NAME).select("embedding").limit(1).execute()
+                if sample.data and sample.data[0].get("embedding"):
+                    old_dim = len(sample.data[0]["embedding"])
+                    test_vec = _embed("test")
+                    if test_vec:
+                        new_dim = len(test_vec)
+                        if old_dim != new_dim:
+                            print(f"[WARN] Dimension mismatch: old={old_dim}, new={new_dim}. Re-seeding...")
+                            db.table(TABLE_NAME).delete().neq("id", 0).execute()
+                            _seed_if_empty()
+                            return
+            except Exception:
+                pass
             print(f"[OK]   Supabase vector DB ready ({count} documents).")
     except Exception as e:
         print(f"[WARN] Could not check/seed DB: {e}")
