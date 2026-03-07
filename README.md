@@ -108,7 +108,7 @@ graph TD
         %% Service 1: Model
         subgraph ModelService ["🧠 Model Service (peerapat9375555/SE)"]
             API1["API: /api/predict"]
-            ONNX[{"⚙️ ONNX Runtime\n(CPU Inference)"}]
+            ONNX("⚙️ ONNX Runtime\n(CPU Inference)")
             API1 --> ONNX
         end
 
