@@ -78,7 +78,7 @@
 ## 🔗 ภาพรวมการไหลของข้อมูล (Data Flow)
 
 <p align="center">
-  <img src="architecture.png" width="100%" alt="DermaAI Microservice Architecture Data Flow">
+  <img src="mermaid-diagram.png" width="100%" alt="DermaAI Microservice Architecture Data Flow">
 </p>
 
 ---
