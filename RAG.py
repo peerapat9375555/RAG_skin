@@ -134,8 +134,65 @@ def _ensure_seeded():
         _seeded = True
 
 
+def _rerank(query: str, documents: list[dict], top_n: int = 4) -> list[dict]:
+    """
+    Reranking — ใช้ LLM ให้คะแนนความเกี่ยวข้องของแต่ละ document กับ query
+    แล้วเลือกเฉพาะ top_n อันดับแรก
+    """
+    if len(documents) <= top_n:
+        return documents
+
+    # สร้าง prompt ให้ LLM ให้คะแนน
+    doc_list = "\n".join([
+        f"[{i+1}] {d['content']}" for i, d in enumerate(documents)
+    ])
+
+    rerank_prompt = f"""คุณคือผู้เชี่ยวชาญด้านการจัดอันดับเอกสาร
+กรุณาจัดอันดับเอกสารด้านล่างตามความเกี่ยวข้องกับคำถามของผู้ใช้
+ตอบเฉพาะหมายเลขของเอกสาร {top_n} อันดับแรกที่เกี่ยวข้องมากที่สุด คั่นด้วยเครื่องหมายจุลภาค
+ตัวอย่าง: 3,1,5,2
+
+คำถาม: {query}
+
+เอกสาร:
+{doc_list}
+
+ตอบเฉพาะหมายเลข {top_n} อันดับแรก (คั่นด้วย ,):"""
+
+    try:
+        response = llm_client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": rerank_prompt}],
+            stream=False,
+            temperature=0.0,
+            max_tokens=50
+        )
+
+        # แปลงคำตอบเป็น index
+        answer = response.choices[0].message.content.strip()
+        indices = []
+        for part in answer.replace(" ", "").split(","):
+            try:
+                idx = int(part) - 1  # convert 1-indexed to 0-indexed
+                if 0 <= idx < len(documents) and idx not in indices:
+                    indices.append(idx)
+            except ValueError:
+                continue
+
+        if indices:
+            reranked = [documents[i] for i in indices[:top_n]]
+            print(f"[OK]   Reranked: selected {len(reranked)} from {len(documents)} documents")
+            return reranked
+
+    except Exception as e:
+        print(f"[WARN] Reranking failed, using original order: {e}")
+
+    # Fallback: ถ้า rerank ไม่ได้ ใช้ลำดับเดิม
+    return documents[:top_n]
+
+
 def get_dermatology_response(user_query: str) -> str:
-    """RAG pipeline: embed query → vector search → LLM generate."""
+    """RAG pipeline: embed query → vector search → rerank → LLM generate."""
     _ensure_seeded()
 
     if not user_query or not str(user_query).strip():
@@ -144,28 +201,33 @@ def get_dermatology_response(user_query: str) -> str:
     # (a) Embed query via API
     query_vector = _embed(user_query)
 
-    # (b) Retrieve from Supabase
-    context = "(ไม่พบข้อมูลที่เกี่ยวข้องในฐานข้อมูล)"
+    # (b) Retrieve from Supabase (ดึง 8 อัน สำหรับ reranking)
+    docs = []
     if query_vector:
         try:
             result = db.rpc(
                 MATCH_FN,
                 {
                     "query_embedding": query_vector,
-                    "match_count":     4,
-                    "match_threshold": 0.2,
+                    "match_count":     8,
+                    "match_threshold": 0.15,
                 }
             ).execute()
             docs = result.data or []
-            if docs:
-                context = "\n".join([f"- {d['content']}" for d in docs])
         except Exception as e:
             print(f"[WARN] Supabase retrieval error: {e}")
-    else:
-        # Fallback: use all seed documents as context if embedding fails
-        context = "\n".join([f"- {doc}" for doc in _INITIAL_DOCUMENTS])
 
-    # (c) Generate with LLM
+    # (c) Reranking — เลือก 4 อันที่เกี่ยวข้องที่สุด
+    if docs:
+        reranked_docs = _rerank(user_query, docs, top_n=4)
+        context = "\n".join([f"- {d['content']}" for d in reranked_docs])
+    elif not query_vector:
+        # Fallback: use all seed documents if embedding fails
+        context = "\n".join([f"- {doc}" for doc in _INITIAL_DOCUMENTS])
+    else:
+        context = "(ไม่พบข้อมูลที่เกี่ยวข้องในฐานข้อมูล)"
+
+    # (d) Generate with LLM
     system_prompt = f"""คุณคือผู้ช่วยอัจฉริยะด้านโรคผิวหนัง
 จงตอบคำถามโดยอ้างอิงและใช้ข้อมูลที่ให้มาใน "ข้อมูลอ้างอิง" เป็นหลัก
 หากผู้ใช้ถามหาวิธีรักษาหรือดูแล ให้สรุปขั้นตอนเป็นข้อๆ ให้เข้าใจง่าย
