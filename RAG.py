@@ -7,6 +7,7 @@ LLM: Gemini via KKU AI Gateway
 
 import os
 import requests
+import google.generativeai as genai
 from openai import OpenAI
 from supabase import create_client, Client
 
@@ -18,8 +19,7 @@ LLM_MODEL    = os.environ.get("LLM_MODEL",    "gemini-3.1-pro-preview")
 
 # Embedding API — ใช้ Google Gemini Embedding (ประหยัด RAM, ไม่ต้องโหลดโมเดล)
 EMBED_API_KEY  = os.environ.get("EMBED_API_KEY",  "")
-EMBED_BASE_URL = os.environ.get("EMBED_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-EMBED_MODEL    = os.environ.get("EMBED_MODEL",    "embedding-001")
+EMBED_MODEL    = os.environ.get("EMBED_MODEL",    "models/text-embedding-004")
 
 # Reranking — ใช้ KKU API key อีกอัน สำหรับ Reranking โดยเฉพาะ
 RERANK_API_KEY  = os.environ.get("RERANK_API_KEY",  LLM_API_KEY)
@@ -35,7 +35,7 @@ MATCH_FN     = "match_skin_documents"
 # ── 2. Initialise clients ─────────────────────────────────────────────────────
 
 llm_client: OpenAI    = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
-embed_client: OpenAI  = OpenAI(api_key=EMBED_API_KEY, base_url=EMBED_BASE_URL)
+genai.configure(api_key=EMBED_API_KEY)
 rerank_client: OpenAI = OpenAI(api_key=RERANK_API_KEY, base_url=RERANK_BASE_URL)
 db: Client            = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -44,11 +44,11 @@ db: Client            = create_client(SUPABASE_URL, SUPABASE_KEY)
 def _embed(text: str) -> list[float]:
     """Get embedding vector via API (no local model needed)."""
     try:
-        response = embed_client.embeddings.create(
+        result = genai.embed_content(
             model=EMBED_MODEL,
-            input=text
+            content=text
         )
-        return response.data[0].embedding
+        return result['embedding']
     except Exception as e:
         print(f"[WARN] Embedding API error: {e}")
         return []
@@ -57,11 +57,13 @@ def _embed(text: str) -> list[float]:
 def _embed_many(texts: list[str]) -> list[list[float]]:
     """Get embedding vectors for multiple texts via API."""
     try:
-        response = embed_client.embeddings.create(
+        result = genai.embed_content(
             model=EMBED_MODEL,
-            input=texts
+            content=texts
         )
-        return [item.embedding for item in response.data]
+        # genai.embed_content returns a single dict with an 'embedding' key 
+        # that contains a list of embeddings if the input was a list of strings
+        return result['embedding']
     except Exception as e:
         print(f"[WARN] Embedding API error: {e}")
         return [[] for _ in texts]
