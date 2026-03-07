@@ -1,9 +1,10 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_cors import CORS
 from RAG import get_dermatology_response, embed_documents
 
 app = Flask(__name__)
+app.secret_key = 'super_secret_admin_key_for_dermaai'
 CORS(app)
 
 # Max upload size: 10 MB
@@ -15,8 +16,30 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 def index():
     return render_template('index.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == 'admin' and password == 'admin':
+            session['logged_in'] = True
+            return redirect(url_for('embed_page'))
+        else:
+            error = 'รหัสผ่านหรือชื่อผู้ใช้ไม่ถูกต้อง'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
+
 @app.route('/embed')
 def embed_page():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
     return render_template('embed.html')
 
 # ─── API: Chat ────────────────────────────────────────────────────────────────
